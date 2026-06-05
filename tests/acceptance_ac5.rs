@@ -1,10 +1,10 @@
-//! AC5: NATS topology config sets a JetStream domain on hub and leaves.
-//! A leaf client can reach a hub JetStream stream via the domain-qualified
-//! API prefix ($JS.hub.API.>).
+//! AC5: NATS topology config sets a `JetStream` domain on hub and leaves.
+//! A leaf client can reach a hub `JetStream` stream via the domain-qualified
+//! API prefix (`$JS.hub.API.>`).
 
 use wm_busbridge::nats_config::{ConfigVariant, NatsTopologyConfig};
 
-/// AC5: hub config contains JetStream domain setting.
+/// AC5: hub config contains `JetStream` domain setting.
 #[test]
 fn test_nats_config_has_jetstream_domain() {
     let hub = NatsTopologyConfig {
@@ -16,11 +16,11 @@ fn test_nats_config_has_jetstream_domain() {
     let rendered = hub.render();
     assert!(
         rendered.contains("domain: \"hub\""),
-        "hub config must set JetStream domain to 'hub'"
+        "hub config must set `JetStream` domain to 'hub'"
     );
 }
 
-/// AC5: leaf config contains its own JetStream domain.
+/// AC5: leaf config contains its own `JetStream` domain.
 #[test]
 fn test_leaf_config_has_own_jetstream_domain() {
     let leaf = NatsTopologyConfig {
@@ -32,7 +32,7 @@ fn test_leaf_config_has_own_jetstream_domain() {
     let rendered = leaf.render();
     assert!(
         rendered.contains("domain: \"leaf-laptop\""),
-        "leaf config must set its own JetStream domain"
+        "leaf config must set its own `JetStream` domain"
     );
 }
 
@@ -91,7 +91,7 @@ fn test_leaf_config_connects_to_hub() {
 
 /// Harness marker: counted by run-metrics.sh as one passing acceptance test per AC.
 #[test]
-fn acceptance_ac5() {
+const fn acceptance_ac5() {
     // All sub-tests in this file must pass for this AC to be considered passing.
     // This function serves as the harness's single-line "acceptance_ac5 ... ok" marker.
 }

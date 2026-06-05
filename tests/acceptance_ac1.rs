@@ -42,7 +42,7 @@ fn test_non_fleet_event_not_forwarded() {
 
 /// Harness marker: counted by run-metrics.sh as one passing acceptance test per AC.
 #[test]
-fn acceptance_ac1() {
+const fn acceptance_ac1() {
     // All sub-tests in this file must pass for this AC to be considered passing.
     // This function serves as the harness's single-line "acceptance_ac1 ... ok" marker.
 }

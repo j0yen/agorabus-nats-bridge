@@ -73,7 +73,7 @@ fn walk_dir(dir: &Path, extensions: &[&str], found: &mut Vec<std::path::PathBuf>
     }
 }
 
-/// AC6: creds_path in leaf config references a variable, not a hardcoded path.
+/// AC6: `creds_path` in leaf config references a variable, not a hardcoded path.
 #[test]
 fn test_leaf_creds_reference_variable() {
     let cfg = NatsTopologyConfig {
@@ -92,7 +92,7 @@ fn test_leaf_creds_reference_variable() {
 
 /// Harness marker: counted by run-metrics.sh as one passing acceptance test per AC.
 #[test]
-fn acceptance_ac6() {
+const fn acceptance_ac6() {
     // All sub-tests in this file must pass for this AC to be considered passing.
     // This function serves as the harness's single-line "acceptance_ac6 ... ok" marker.
 }

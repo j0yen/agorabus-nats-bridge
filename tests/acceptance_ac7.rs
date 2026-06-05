@@ -1,19 +1,21 @@
-//! AC7: wm-busbridge selftest subcommand passes and daemon is SIGPIPE-safe.
+//! AC7: `wm-busbridge` selftest subcommand passes and daemon is SIGPIPE-safe.
+// Tests may legitimately panic on infrastructure failures (unreadable files, bad env).
+#![allow(clippy::panic)]
 //!
 //! The selftest requires a live NATS server. Without one, we assert the
 //! SIGPIPE safety and the selftest module compiles with the expected interface.
 //! A live-hardware selftest is documented in the deferred section.
 
-/// AC7: SIGPIPE safety — the binary is compiled with sigpipe::reset() at the
-/// start of main(). We verify this structurally by checking main.rs contains
-/// the sigpipe::reset() call and that the sigpipe crate is a dependency.
+/// AC7: SIGPIPE safety — the binary is compiled with `sigpipe::reset()` at the
+/// start of `main()`. We verify this structurally by checking `main.rs` contains
+/// the `sigpipe::reset()` call and that the `sigpipe` crate is a dependency.
 #[test]
 fn test_sigpipe_reset_present() {
     // Verify the Cargo.toml declares sigpipe as a dependency
     let cargo_toml = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
     )
-    .expect("Cargo.toml must be readable");
+    .unwrap_or_else(|e| panic!("Cargo.toml must be readable: {e}"));
     assert!(
         cargo_toml.contains("sigpipe"),
         "Cargo.toml must declare sigpipe as a dependency"
@@ -23,7 +25,7 @@ fn test_sigpipe_reset_present() {
     let main_rs = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs"),
     )
-    .expect("src/main.rs must be readable");
+    .unwrap_or_else(|e| panic!("src/main.rs must be readable: {e}"));
     assert!(
         main_rs.contains("sigpipe::reset()"),
         "src/main.rs must call sigpipe::reset() as the first statement in main"
@@ -37,8 +39,8 @@ fn test_selftest_subcommand_interface() {
     // This test verifies the selftest module's interface compiles correctly.
     // The actual selftest requires a live NATS server (deferred AC).
     // We verify the function signature is correct by using it in a type assertion.
-    use wm_busbridge::selftest;
     use wm_busbridge::config::BridgeConfig;
+    use wm_busbridge::selftest;
 
     // Construct a config — no live connection attempted here
     let cfg = BridgeConfig {
@@ -51,7 +53,6 @@ fn test_selftest_subcommand_interface() {
     // We don't .await it here to avoid requiring a live NATS server in CI
     let _future = selftest::run(cfg);
     // If this compiles, the interface is correct.
-    println!("selftest::run interface verified (compile-time check)");
 }
 
 /// AC7: selftest subcommand roundtrip — deferred, requires live NATS.
@@ -61,7 +62,7 @@ fn test_selftest_subcommand_interface() {
 #[test]
 fn test_selftest_subcommand_roundtrip() {
     if std::env::var("WM_BRIDGE_SELFTEST_LIVE").as_deref() != Ok("1") {
-        println!("SKIP: WM_BRIDGE_SELFTEST_LIVE not set (no live NATS); selftest roundtrip deferred");
+        // SKIP: WM_BRIDGE_SELFTEST_LIVE not set (no live NATS); selftest roundtrip deferred
         return;
     }
     // Live path: run the selftest binary and check exit code
@@ -70,13 +71,13 @@ fn test_selftest_subcommand_roundtrip() {
     let status = std::process::Command::new(env!("CARGO_BIN_EXE_wm-busbridge"))
         .args(["--nats-url", &nats_url, "selftest"])
         .status()
-        .expect("failed to run wm-busbridge selftest");
+        .unwrap_or_else(|e| panic!("failed to run wm-busbridge selftest: {e}"));
     assert!(status.success(), "wm-busbridge selftest must exit 0");
 }
 
 /// Harness marker: counted by run-metrics.sh as one passing acceptance test per AC.
 #[test]
-fn acceptance_ac7() {
+const fn acceptance_ac7() {
     // All sub-tests in this file must pass for this AC to be considered passing.
     // This function serves as the harness's single-line "acceptance_ac7 ... ok" marker.
 }

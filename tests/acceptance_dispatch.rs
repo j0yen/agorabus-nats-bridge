@@ -1,5 +1,7 @@
-//! Acceptance tests for the constellation-dispatch layer (PRD-constellation-dispatch
-//! and PRD-constellation-cloud-build).
+//! Acceptance tests for the constellation-dispatch layer (`PRD-constellation-dispatch`
+//! and `PRD-constellation-cloud-build`).
+// Tests may legitimately panic on serialization failures.
+#![allow(clippy::panic)]
 //!
 //! These tests verify the dispatch module's AC coverage without requiring a live
 //! NATS server — all assertions are against the pure dispatch logic.
@@ -121,8 +123,10 @@ fn node_capability_json_roundtrip() {
         no_build: false,
         role: None,
     };
-    let json = serde_json::to_string(&cap).expect("serialize must succeed");
-    let back: NodeCapability = serde_json::from_str(&json).expect("deserialize must succeed");
+    let json = serde_json::to_string(&cap)
+        .unwrap_or_else(|e| panic!("serialize must succeed: {e}"));
+    let back: NodeCapability = serde_json::from_str(&json)
+        .unwrap_or_else(|e| panic!("deserialize must succeed: {e}"));
     assert_eq!(cap, back);
 }
 
@@ -218,7 +222,7 @@ fn small_job_payload_accepted() {
         "path": "/home/jsy/wintermute/recall",
         "crate": "recall"
     }))
-    .expect("serialize");
+    .unwrap_or_else(|e| panic!("serialize: {e}"));
     assert!(check_payload_size(&bytes).is_ok());
 }
 
@@ -226,23 +230,27 @@ fn small_job_payload_accepted() {
 #[test]
 fn oversized_job_payload_rejected_with_clear_error() {
     let large = vec![0u8; MAX_JOB_PAYLOAD_BYTES + 1];
-    let err = check_payload_size(&large).unwrap_err();
-    let msg = err.to_string();
-    // The error message must mention the bus / shared storage so the caller
-    // knows to use shared storage instead.
-    assert!(
-        msg.contains("shared storage") || msg.contains("bus limit"),
-        "error message must guide the caller to use shared storage: {msg}"
-    );
+    let result = check_payload_size(&large);
+    assert!(result.is_err(), "oversized payload must be rejected");
+    if let Err(e) = result {
+        let msg = e.to_string();
+        // The error message must mention the bus / shared storage so the caller
+        // knows to use shared storage instead.
+        assert!(
+            msg.contains("shared storage") || msg.contains("bus limit"),
+            "error message must guide the caller to use shared storage: {msg}"
+        );
+    }
 }
 
 /// The size limit constant is documented and reasonable (≤ 1 MiB).
 #[test]
-fn payload_size_limit_is_sane() {
-    assert!(MAX_JOB_PAYLOAD_BYTES > 0, "limit must be non-zero");
-    assert!(
+const fn payload_size_limit_is_sane() {
+    // Evaluated at compile time — use const assert to avoid the assert!(true) lint.
+    const _: () = assert!(MAX_JOB_PAYLOAD_BYTES > 0, "limit must be non-zero");
+    const _: () = assert!(
         MAX_JOB_PAYLOAD_BYTES <= 1024 * 1024,
-        "limit must be ≤ 1 MiB to keep the bus lean"
+        "limit must be <= 1 MiB to keep the bus lean"
     );
 }
 
@@ -363,4 +371,4 @@ fn fleet_invariant_all_local_llm_means_build_unplaceable() {
 
 /// Acceptance harness marker — all sub-tests above must pass.
 #[test]
-fn acceptance_dispatch() {}
+const fn acceptance_dispatch() {}

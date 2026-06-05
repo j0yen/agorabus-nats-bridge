@@ -57,7 +57,7 @@ fn test_blocked_takes_priority_over_allow() {
 
 /// Harness marker: counted by run-metrics.sh as one passing acceptance test per AC.
 #[test]
-fn acceptance_ac4() {
+const fn acceptance_ac4() {
     // All sub-tests in this file must pass for this AC to be considered passing.
     // This function serves as the harness's single-line "acceptance_ac4 ... ok" marker.
 }

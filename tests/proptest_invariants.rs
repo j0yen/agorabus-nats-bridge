@@ -1,6 +1,7 @@
 //! Proptest invariants for wm-busbridge.
 
 use proptest::prelude::*;
+use proptest::test_runner::TestCaseError;
 use wm_busbridge::forward::{BridgedPayload, should_forward};
 
 proptest! {
@@ -32,7 +33,8 @@ proptest! {
             serde_json::json!({"test": true}),
             from,
         );
-        let val = serde_json::to_value(&original).unwrap();
+        let val = serde_json::to_value(&original)
+            .map_err(|e| TestCaseError::fail(format!("serialize failed: {e}")))?;
         prop_assert!(BridgedPayload::is_bridged(&val));
         prop_assert_eq!(
             val.get("topic").and_then(|v| v.as_str()),
