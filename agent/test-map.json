@@ -1,0 +1,9 @@
+{
+  "AC1": "tests/acceptance_ac1.rs::test_fleet_event_forwarded_to_nats",
+  "AC2": "tests/acceptance_ac2.rs::test_local_clients_unaffected",
+  "AC3": "tests/acceptance_ac3.rs::test_loop_guard_no_echo",
+  "AC4": "tests/acceptance_ac4.rs::test_local_only_topic_not_forwarded",
+  "AC5": "tests/acceptance_ac5.rs::test_nats_config_has_jetstream_domain",
+  "AC6": "tests/acceptance_ac6.rs::test_no_plaintext_creds_in_repo",
+  "AC7": "tests/acceptance_ac7.rs::test_selftest_subcommand_roundtrip"
+}

@@ -1,0 +1,31 @@
+# proof-lanes.toml — routes every changed path to a verification lane.
+
+[[lane]]
+name = "unit-tests"
+paths = ["src/**"]
+checks = ["cargo test --workspace --no-fail-fast"]
+confidence = 0.85
+
+[[lane]]
+name = "integration-tests"
+paths = ["tests/**"]
+checks = ["cargo test --workspace --no-fail-fast"]
+confidence = 0.85
+
+[[lane]]
+name = "clippy"
+paths = ["src/**", "tests/**", "Cargo.toml"]
+checks = ["cargo clippy --workspace -- -D warnings"]
+confidence = 0.90
+
+[[lane]]
+name = "deny"
+paths = ["Cargo.toml", "deny.toml"]
+checks = ["cargo deny check bans licenses sources"]
+confidence = 0.90
+
+[[lane]]
+name = "proptest"
+paths = ["tests/proptest_invariants.rs", "src/forward.rs"]
+checks = ["cargo test proptest"]
+confidence = 0.80

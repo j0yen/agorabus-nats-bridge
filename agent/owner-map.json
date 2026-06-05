@@ -1,0 +1,9 @@
+{
+  "src/main.rs": ["AC7"],
+  "src/bridge.rs": ["AC1", "AC2", "AC3"],
+  "src/config.rs": ["AC1", "AC2"],
+  "src/forward.rs": ["AC1", "AC3", "AC4"],
+  "src/nats_config.rs": ["AC5", "AC6"],
+  "src/selftest.rs": ["AC7"],
+  "src/lib.rs": ["AC1", "AC2", "AC3", "AC4", "AC5", "AC6", "AC7"]
+}
