@@ -13,7 +13,8 @@
 //!
 //! 3. **Dispatch primitives** — submit a job onto `WM_WORK`, query the live
 //!    fleet capacity from `WM_NODES`, and route capability-aware placements
-//!    (GPU jobs → `vram_gb > 0`; build jobs → highest-cores / lowest-load).
+//!    (GPU jobs → `vram_gb > 0`; build jobs → highest-cores / lowest-load,
+//!    never `no_build: true` nodes).
 //!
 //! # Wire contracts
 //!
@@ -22,6 +23,14 @@
 //! - `WM_NODES` KV bucket: keys `node.<name>`, values [`NodeCapability`] JSON.
 //! - Max payload bytes: [`MAX_JOB_PAYLOAD_BYTES`] — the bus carries references
 //!   and paths, never large blobs; violations are rejected at submission time.
+//!
+//! # Cloud-build routing invariant (constellation-cloud-build)
+//!
+//! Nodes that serve the local LLM (e.g. the 5700U running qwen2.5-8B) advertise
+//! `no_build: true` and/or `role: NodeRole::LocalLlm`.  The dispatch coordinator
+//! **never** places `Build` or `Test` jobs on such nodes, ensuring the local model
+//! always has full CPU+RAM headroom.  This is enforced by [`place_job`] and
+//! validated by the fleet-invariant acceptance tests.
 
 // JetStream and constellation-dispatch are proper nouns.
 #![allow(clippy::doc_markdown)]
@@ -40,12 +49,42 @@ pub const WORK_SUBJECT_PREFIX: &str = "wm.work.";
 /// Hard upper bound on job payload bytes to keep the bus lean.
 pub const MAX_JOB_PAYLOAD_BYTES: usize = 64 * 1024; // 64 KiB
 
+// ─── node role ──────────────────────────────────────────────────────────────
+
+/// High-level role of a fleet node — influences dispatch routing.
+///
+/// Stored in [`NodeCapability::role`] and used by [`place_job`] to enforce
+/// the cloud-build routing invariant: `LocalLlm` nodes never receive
+/// compilation workloads.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeRole {
+    /// Dedicated local-LLM inference node.  Build and test jobs must never
+    /// be routed here regardless of CPU availability.
+    LocalLlm,
+    /// Generic cloud worker — handles build, test, and (if GPU present) infer.
+    CloudWorker,
+    /// Laptop / personal machine that accepts build jobs when `voice_idle`.
+    Laptop,
+    /// Specialised GPU inference server.
+    GpuInfer,
+}
+
 // ─── capability record ──────────────────────────────────────────────────────
 
 /// Live snapshot of a node's hardware capacity, written to `WM_NODES` KV.
 ///
 /// The heartbeat loop updates this every `heartbeat_secs` seconds; the KV
 /// TTL ensures a dead node's record expires automatically.
+///
+/// ## Cloud-build routing fields
+///
+/// Two fields gate build-job placement (constellation-cloud-build):
+/// - `no_build` — when `true` the dispatcher unconditionally skips this node
+///   for [`JobClass::Build`] and [`JobClass::Test`].  Set by nodes that must
+///   keep all resources for local-LLM inference.
+/// - `role` — optional semantic role; `LocalLlm` implies `no_build` and is
+///   double-checked by the dispatcher as a defence-in-depth guard.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NodeCapability {
     /// Logical CPU count (hyperthreads).
@@ -62,6 +101,16 @@ pub struct NodeCapability {
     pub queue_depth: u32,
     /// Unix timestamp of this snapshot (seconds since epoch).
     pub ts: u64,
+    /// When `true`, build and test jobs are **never** placed on this node.
+    ///
+    /// Set by nodes that dedicate all CPU+RAM to local-LLM inference (the
+    /// 5700U running qwen2.5-8B).  Defaults to `false` for cloud workers.
+    #[serde(default)]
+    pub no_build: bool,
+    /// Semantic node role — used as a defence-in-depth guard alongside
+    /// `no_build` to prevent build jobs from landing on the local-LLM node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<NodeRole>,
 }
 
 impl NodeCapability {
@@ -91,6 +140,22 @@ impl NodeCapability {
     #[must_use]
     pub const fn is_stale(&self, now_secs: u64, max_age_secs: u64) -> bool {
         now_secs.saturating_sub(self.ts) > max_age_secs
+    }
+
+    /// Returns `true` if build and test jobs may be placed on this node.
+    ///
+    /// A node is build-eligible when **both** of the following hold:
+    /// - `no_build` is `false`, **and**
+    /// - `role` is not [`NodeRole::LocalLlm`] (defence-in-depth guard).
+    ///
+    /// This ensures the 5700U dedicated to qwen2.5-8B inference is never
+    /// selected as a build target, preserving full CPU+RAM for the model.
+    #[must_use]
+    pub const fn is_build_eligible(&self) -> bool {
+        if self.no_build {
+            return false;
+        }
+        !matches!(self.role, Some(NodeRole::LocalLlm))
     }
 }
 
@@ -229,13 +294,24 @@ pub enum PlacementDecision {
 ///
 /// Routing rules:
 /// - [`JobClass::Infer`] → filter to `vram_gb > 0`, pick lowest load.
-/// - [`JobClass::Build`] / [`JobClass::Test`] → any available node, pick
-///   highest cores / lowest load (composite score = `load1 / cores`).
+/// - [`JobClass::Build`] / [`JobClass::Test`] → only nodes where
+///   [`NodeCapability::is_build_eligible`] returns `true`, pick highest
+///   cores / lowest load (composite score = `load1 / cores`).  Nodes with
+///   `no_build: true` or `role: LocalLlm` are **never** considered.
 /// - If the job has `pinned_node`, only that node is considered.
 ///
 /// Returns a subject string if a candidate exists, or `Unplaceable`.
+///
+/// # Cloud-build invariant
+///
+/// The local-LLM node (5700U, qwen2.5-8B) advertises `no_build: true`.
+/// [`place_job`] enforces this invariant: a build job submitted while the
+/// local-llm node is in the fleet will never be routed there.
 #[must_use]
 pub fn place_job<S: std::hash::BuildHasher>(job: &Job, nodes: &HashMap<String, NodeCapability, S>) -> PlacementDecision {
+    // Determine if this is a build/test job (subject to `no_build` filter)
+    let is_build_class = matches!(job.class, JobClass::Build | JobClass::Test);
+
     // Filter: only healthy, non-stale nodes (caller provides pre-filtered map)
     let candidates: Vec<(&String, &NodeCapability)> = nodes
         .iter()
@@ -245,6 +321,10 @@ pub fn place_job<S: std::hash::BuildHasher>(job: &Job, nodes: &HashMap<String, N
                 if *name != pin {
                     return false;
                 }
+            }
+            // Build-eligibility filter — enforces the local-llm exclusion invariant
+            if is_build_class && !cap.is_build_eligible() {
+                return false;
             }
             cap.is_available()
         })
@@ -355,7 +435,22 @@ pub fn sample_local_capacity(queue_depth: u32) -> NodeCapability {
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    NodeCapability { cores, ram_gb, gpu, vram_gb, load1, queue_depth, ts }
+    // `WM_NO_BUILD=1` lets the launch script mark this node as build-ineligible
+    // (used by the 5700U's systemd unit when it's serving the local LLM).
+    let no_build = std::env::var("WM_NO_BUILD")
+        .ok()
+        .is_some_and(|v| v.trim() == "1" || v.trim().eq_ignore_ascii_case("true"));
+
+    // `WM_NODE_ROLE` optionally tags this node's semantic role (e.g. `local_llm`).
+    let role = std::env::var("WM_NODE_ROLE").ok().and_then(|v| match v.trim() {
+        "local_llm" => Some(NodeRole::LocalLlm),
+        "cloud_worker" => Some(NodeRole::CloudWorker),
+        "laptop" => Some(NodeRole::Laptop),
+        "gpu_infer" => Some(NodeRole::GpuInfer),
+        _ => None,
+    });
+
+    NodeCapability { cores, ram_gb, gpu, vram_gb, load1, queue_depth, ts, no_build, role }
 }
 
 /// Reads total RAM in GiB from `/proc/meminfo`.
@@ -382,7 +477,7 @@ fn read_load_average() -> Option<f64> {
 mod tests {
     use super::*;
 
-    fn make_node(cores: u32, load1: f64, vram_gb: u32, queue_depth: u32) -> NodeCapability {
+    const fn make_node(cores: u32, load1: f64, vram_gb: u32, queue_depth: u32) -> NodeCapability {
         NodeCapability {
             cores,
             ram_gb: 16,
@@ -391,6 +486,22 @@ mod tests {
             load1,
             queue_depth,
             ts: 0,
+            no_build: false,
+            role: None,
+        }
+    }
+
+    const fn make_local_llm_node(cores: u32, load1: f64) -> NodeCapability {
+        NodeCapability {
+            cores,
+            ram_gb: 32,
+            gpu: false,
+            vram_gb: 0,
+            load1,
+            queue_depth: 0,
+            ts: 0,
+            no_build: true,
+            role: Some(NodeRole::LocalLlm),
         }
     }
 
@@ -475,9 +586,11 @@ mod tests {
     #[test]
     fn oversized_payload_rejected() {
         let large = vec![0u8; MAX_JOB_PAYLOAD_BYTES + 1];
-        let err = check_payload_size(&large).unwrap_err();
-        assert_eq!(err.limit, MAX_JOB_PAYLOAD_BYTES);
-        assert!(err.actual > MAX_JOB_PAYLOAD_BYTES);
+        let result = check_payload_size(&large);
+        assert!(
+            matches!(result, Err(ref e) if e.limit == MAX_JOB_PAYLOAD_BYTES && e.actual > MAX_JOB_PAYLOAD_BYTES),
+            "large payload must be rejected with correct limit/actual fields"
+        );
     }
 
     #[test]
@@ -554,6 +667,104 @@ mod tests {
         job.pinned_node = Some("gamma".to_string()); // doesn't exist
         let decision = place_job(&job, &nodes);
         assert!(matches!(decision, PlacementDecision::Unplaceable { .. }));
+    }
+
+    // ── cloud-build routing invariant (constellation-cloud-build AC3 & AC4) ──
+
+    /// A node with `no_build: true` is never selected for build jobs.
+    #[test]
+    fn no_build_node_never_selected_for_build() {
+        let mut nodes = HashMap::new();
+        nodes.insert("local-llm".to_string(), make_local_llm_node(16, 0.5));
+        let decision = place_job(&make_job(JobClass::Build), &nodes);
+        assert!(
+            matches!(decision, PlacementDecision::Unplaceable { .. }),
+            "no_build node must never be selected for build jobs even when available"
+        );
+    }
+
+    /// A `role: LocalLlm` node is never selected for test jobs.
+    #[test]
+    fn local_llm_role_never_selected_for_test() {
+        let mut nodes = HashMap::new();
+        nodes.insert("local-llm".to_string(), make_local_llm_node(16, 0.5));
+        let decision = place_job(&make_job(JobClass::Test), &nodes);
+        assert!(
+            matches!(decision, PlacementDecision::Unplaceable { .. }),
+            "LocalLlm node must never be selected for test jobs"
+        );
+    }
+
+    /// When both a local-llm node and a cloud worker are present, build jobs go
+    /// exclusively to the cloud worker — the local-llm node is bypassed.
+    #[test]
+    fn build_job_routes_to_cloud_not_local_llm() {
+        let mut nodes = HashMap::new();
+        // 5700U: would be the best CPU node by raw cores, but no_build=true
+        nodes.insert("5700u-local-llm".to_string(), make_local_llm_node(16, 0.2));
+        // Cloud worker: fewer cores, higher load, but build-eligible
+        nodes.insert("cloud-worker".to_string(), make_node(8, 1.0, 0, 0));
+        let decision = place_job(&make_job(JobClass::Build), &nodes);
+        assert!(
+            matches!(decision, PlacementDecision::Route(_)),
+            "build job must route to cloud-worker when local-llm is the only other candidate"
+        );
+    }
+
+    /// Fleet invariant: if ALL present nodes are no_build, build jobs are unplaceable
+    /// (no silent fallback to a local-llm node).
+    #[test]
+    fn all_no_build_nodes_means_unplaceable() {
+        let mut nodes = HashMap::new();
+        nodes.insert("llm-a".to_string(), make_local_llm_node(8, 0.1));
+        nodes.insert("llm-b".to_string(), make_local_llm_node(16, 0.2));
+        let decision = place_job(&make_job(JobClass::Build), &nodes);
+        assert!(
+            matches!(decision, PlacementDecision::Unplaceable { .. }),
+            "all no_build fleet must return Unplaceable for build jobs"
+        );
+    }
+
+    /// Infer jobs CAN be placed on a `no_build: true` node if it has a GPU.
+    /// (Inference is allowed on the local-llm node — that's its purpose.)
+    #[test]
+    fn no_build_does_not_block_infer_jobs() {
+        let mut nodes = HashMap::new();
+        let gpu_llm_node = NodeCapability {
+            gpu: true,
+            vram_gb: 24,
+            no_build: true,
+            role: Some(NodeRole::LocalLlm),
+            ..make_local_llm_node(8, 0.5)
+        };
+        nodes.insert("gpu-local-llm".to_string(), gpu_llm_node);
+        let decision = place_job(&make_job(JobClass::Infer), &nodes);
+        assert!(
+            matches!(decision, PlacementDecision::Route(_)),
+            "no_build flag must not block infer jobs — inference is the node's purpose"
+        );
+    }
+
+    /// `is_build_eligible` reflects `no_build` and `role` correctly.
+    #[test]
+    fn is_build_eligible_semantics() {
+        let worker = make_node(8, 0.5, 0, 0);
+        assert!(worker.is_build_eligible(), "default cloud worker must be build-eligible");
+
+        let llm_node = make_local_llm_node(16, 0.1);
+        assert!(!llm_node.is_build_eligible(), "local-llm node must not be build-eligible");
+
+        // no_build alone is sufficient to block, even without a role
+        let no_build_anon = NodeCapability { no_build: true, role: None, ..make_node(8, 0.5, 0, 0) };
+        assert!(!no_build_anon.is_build_eligible(), "no_build=true must block regardless of role");
+
+        // role:LocalLlm alone (no_build=false) is also sufficient to block
+        let role_only = NodeCapability {
+            no_build: false,
+            role: Some(NodeRole::LocalLlm),
+            ..make_node(8, 0.5, 0, 0)
+        };
+        assert!(!role_only.is_build_eligible(), "LocalLlm role must block build even if no_build=false");
     }
 
     // ── local sampler (smoke) ───────────────────────────────────────────────

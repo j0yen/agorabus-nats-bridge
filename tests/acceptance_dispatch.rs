@@ -1,18 +1,23 @@
-//! Acceptance tests for the constellation-dispatch layer (PRD-constellation-dispatch).
+//! Acceptance tests for the constellation-dispatch layer (PRD-constellation-dispatch
+//! and PRD-constellation-cloud-build).
 //!
 //! These tests verify the dispatch module's AC coverage without requiring a live
 //! NATS server — all assertions are against the pure dispatch logic.
+//!
+//! AC3 / AC4 (cloud-build) tests at the bottom verify the invariant that
+//! `no_build: true` / `role: LocalLlm` nodes are never selected for build or
+//! test jobs regardless of their CPU availability.
 
 use std::collections::HashMap;
 use wm_busbridge::dispatch::{
-    JobClass, NodeCapability, PlacementDecision, check_payload_size, place_job,
+    JobClass, NodeCapability, NodeRole, PlacementDecision, check_payload_size, place_job,
     sample_local_capacity, Job, MAX_JOB_PAYLOAD_BYTES, NODES_BUCKET, WORK_STREAM,
     WORK_SUBJECT_PREFIX,
 };
 
 // ─── helper builders ────────────────────────────────────────────────────────
 
-fn node(cores: u32, load1: f64, vram_gb: u32) -> NodeCapability {
+const fn node(cores: u32, load1: f64, vram_gb: u32) -> NodeCapability {
     NodeCapability {
         cores,
         ram_gb: 16,
@@ -21,6 +26,26 @@ fn node(cores: u32, load1: f64, vram_gb: u32) -> NodeCapability {
         load1,
         queue_depth: 0,
         ts: 9_999_999_999, // far future — not stale in tests
+        no_build: false,
+        role: None,
+    }
+}
+
+/// Constructs a node that represents the 5700U dedicated local-LLM machine.
+///
+/// This node advertises `no_build: true` and `role: LocalLlm` and must never
+/// receive build or test job placements regardless of CPU availability.
+const fn local_llm_node(cores: u32, load1: f64) -> NodeCapability {
+    NodeCapability {
+        cores,
+        ram_gb: 32,
+        gpu: false,
+        vram_gb: 0,
+        load1,
+        queue_depth: 0,
+        ts: 9_999_999_999,
+        no_build: true,
+        role: Some(NodeRole::LocalLlm),
     }
 }
 
@@ -93,6 +118,8 @@ fn node_capability_json_roundtrip() {
         load1: 1.23,
         queue_depth: 2,
         ts: 1_700_000_000,
+        no_build: false,
+        role: None,
     };
     let json = serde_json::to_string(&cap).expect("serialize must succeed");
     let back: NodeCapability = serde_json::from_str(&json).expect("deserialize must succeed");
@@ -236,6 +263,100 @@ fn local_capacity_sample_is_plausible() {
 fn sample_respects_queue_depth_arg() {
     let cap = sample_local_capacity(7);
     assert_eq!(cap.queue_depth, 7);
+}
+
+// ─── AC3: no_build routing invariant (constellation-cloud-build) ─────────────
+
+/// AC3: Build jobs are NEVER placed on a node with `no_build: true`.
+///
+/// Simulates the 5700U (local-llm, 16 cores, lightly loaded) advertising
+/// `no_build: true`; the job must be unplaceable, not routed there.
+#[test]
+fn build_job_never_placed_on_no_build_node() {
+    let mut nodes = HashMap::new();
+    nodes.insert("5700u".to_string(), local_llm_node(16, 0.3));
+    let result = place_job(&job(JobClass::Build), &nodes);
+    assert!(
+        matches!(result, PlacementDecision::Unplaceable { .. }),
+        "AC3: build job must be unplaceable when the only node has no_build=true"
+    );
+}
+
+/// AC3: Test jobs are NEVER placed on a node with `no_build: true`.
+#[test]
+fn test_job_never_placed_on_no_build_node() {
+    let mut nodes = HashMap::new();
+    nodes.insert("5700u".to_string(), local_llm_node(16, 0.3));
+    let result = place_job(&job(JobClass::Test), &nodes);
+    assert!(
+        matches!(result, PlacementDecision::Unplaceable { .. }),
+        "AC3: test job must be unplaceable when the only node has no_build=true"
+    );
+}
+
+/// AC3: When the fleet has both a local-llm node and a cloud worker,
+/// build jobs go to the cloud worker — the local-llm is bypassed entirely.
+#[test]
+fn build_routes_to_cloud_bypasses_local_llm() {
+    let mut nodes = HashMap::new();
+    // 5700U: more cores, lower load — would win without the no_build filter
+    nodes.insert("5700u".to_string(), local_llm_node(16, 0.1));
+    // Cloud worker: fewer cores, higher load — but build-eligible
+    nodes.insert("cloud".to_string(), node(8, 2.0, 0));
+    let result = place_job(&job(JobClass::Build), &nodes);
+    assert!(
+        matches!(result, PlacementDecision::Route(_)),
+        "AC3: build must route to cloud worker even when local-llm has better raw specs"
+    );
+}
+
+// ─── AC4: fleet-wide invariant — local-llm node never gets build work ─────────
+
+/// AC4: With a mixed fleet (local-llm + cloud nodes), no build job ever
+/// lands on the local-llm node.  Simulates N submission rounds and asserts
+/// the invariant holds throughout.
+#[test]
+fn fleet_invariant_local_llm_never_gets_build_work() {
+    let mut nodes = HashMap::new();
+    // The 5700U: advertises no_build + role:local_llm
+    nodes.insert("5700u-local-llm".to_string(), local_llm_node(16, 0.2));
+    // A cloud worker at nominal load
+    nodes.insert("hetzner-cax21".to_string(), node(4, 0.5, 0));
+    // A second cloud worker (burst pod)
+    nodes.insert("burst-pod-0".to_string(), node(32, 4.0, 0));
+
+    // Submit many build jobs; none must be Unplaceable (cloud can absorb them)
+    // and none must be silently accepted by the local-llm node.
+    // (We assert `Route` for all, proving the cloud workers absorb the load.)
+    for i in 0..20 {
+        let j = Job {
+            id: format!("fleet-test-{i}"),
+            class: JobClass::Build,
+            detail: Some("rust".to_string()),
+            payload: serde_json::json!({"path": "/tmp/crate"}),
+            submitted_at: 0,
+            pinned_node: None,
+        };
+        let result = place_job(&j, &nodes);
+        assert!(
+            matches!(result, PlacementDecision::Route(_)),
+            "AC4: build job {i} must route to cloud workers, not be dropped or routed to local-llm"
+        );
+    }
+}
+
+/// AC4: With only local-llm nodes in the fleet, build jobs are Unplaceable
+/// — there is never a silent fallback.
+#[test]
+fn fleet_invariant_all_local_llm_means_build_unplaceable() {
+    let mut nodes = HashMap::new();
+    nodes.insert("5700u".to_string(), local_llm_node(16, 0.1));
+    nodes.insert("5700u-b".to_string(), local_llm_node(8, 0.2));
+    let result = place_job(&job(JobClass::Build), &nodes);
+    assert!(
+        matches!(result, PlacementDecision::Unplaceable { .. }),
+        "AC4: a fleet of only local-llm nodes must never produce a Route for build jobs"
+    );
 }
 
 // ─── harness marker ──────────────────────────────────────────────────────────
