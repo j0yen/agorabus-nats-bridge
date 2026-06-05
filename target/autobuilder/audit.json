@@ -1,0 +1,17 @@
+{
+  "schema": "autobuilder.bad_rust_audit.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "findings": [
+    {
+      "rule_id": "HLT-016-SUPPLY-CHAIN-DRIFT",
+      "detector": "cargo_deny_check",
+      "severity": "advisory",
+      "path": "deny.toml",
+      "line": 0,
+      "snippet": "",
+      "explanation": "cargo-deny not installed; supply-chain check skipped"
+    }
+  ],
+  "blocking_count": 0,
+  "advisory_count": 1
+}

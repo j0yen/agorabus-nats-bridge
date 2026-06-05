@@ -1,31 +1,53 @@
-# proof-lanes.toml — routes every changed path to a verification lane.
+# proof-lanes.toml — change-class → required-lane routing.
+# READ-ONLY after scaffold. The edit-agent must NOT modify this.
 
 [[lane]]
-name = "unit-tests"
-paths = ["src/**"]
-checks = ["cargo test --workspace --no-fail-fast"]
-confidence = 0.85
+id = "rust-source"
+description = "Behavior changes in src/"
+globs = ["src/**/*.rs"]
+required_commands = [
+  "cargo check --workspace",
+  "cargo clippy --workspace -- -D warnings",
+  "cargo test --workspace",
+]
 
 [[lane]]
-name = "integration-tests"
-paths = ["tests/**"]
-checks = ["cargo test --workspace --no-fail-fast"]
-confidence = 0.85
+id = "rust-tests"
+description = "Test-only changes"
+globs = ["tests/**/*.rs"]
+required_commands = [
+  "cargo test --workspace",
+]
 
 [[lane]]
-name = "clippy"
-paths = ["src/**", "tests/**", "Cargo.toml"]
-checks = ["cargo clippy --workspace -- -D warnings"]
-confidence = 0.90
+id = "deps"
+description = "Cargo.toml / Cargo.lock changes"
+globs = ["Cargo.toml", "Cargo.lock"]
+required_commands = [
+  "cargo check --workspace",
+  "cargo deny check bans licenses sources",
+]
 
 [[lane]]
-name = "deny"
-paths = ["Cargo.toml", "deny.toml"]
-checks = ["cargo deny check bans licenses sources"]
-confidence = 0.90
+id = "ci"
+description = "GitHub Actions workflow changes"
+globs = [".github/workflows/**"]
+required_commands = [
+  "scripts/audit.sh",
+]
 
 [[lane]]
-name = "proptest"
-paths = ["tests/proptest_invariants.rs", "src/forward.rs"]
-checks = ["cargo test proptest"]
-confidence = 0.80
+id = "harness-readonly"
+description = "Harness files; should never change after scaffold"
+globs = [
+  "scripts/run-metrics.sh",
+  "scripts/audit.sh",
+  "scripts/risk-gate.sh",
+  "clippy.toml",
+  "deny.toml",
+  "rust-toolchain.toml",
+]
+required_commands = [
+  "exit 1",
+]
+note = "Any change to a harness-readonly path fails the gate. Use an intent-card amendment to legitimately modify."

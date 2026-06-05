@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.bad_rust_audit.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "blocking_count": 0,
+  "advisory_count": 1,
+  "verdict": "pass",
+  "captured_at": "2026-06-05T01:56:25Z"
+}

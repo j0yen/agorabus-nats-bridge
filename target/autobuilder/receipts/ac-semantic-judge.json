@@ -1,0 +1,16 @@
+{
+  "schema": "autobuilder.ac_semantic_judge.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "passed": true,
+  "ac_verdicts": [
+    {"id": "AC1", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.85},
+    {"id": "AC2", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.80},
+    {"id": "AC3", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.90},
+    {"id": "AC4", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.90},
+    {"id": "AC5", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.85},
+    {"id": "AC6", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.95},
+    {"id": "AC7", "behavior_match": "yes", "assertion_kind": "behavioral", "confidence": 0.85}
+  ],
+  "note": "AC1/AC2 are unit-level policy tests (concern noted in reviewer receipt: no socket-level integration). AC3-AC7 are directly falsifiable against the described behavior. No AC is a pure restatement of impl.",
+  "captured_at": "2026-06-05T01:55:57Z"
+}

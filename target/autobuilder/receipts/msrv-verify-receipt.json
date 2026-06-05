@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.msrv_verify_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "msrv": "1.85.0",
+  "verdict": "pass",
+  "result": "cargo check passes on rust 1.85.0",
+  "captured_at": "2026-06-05T01:55:16Z"
+}

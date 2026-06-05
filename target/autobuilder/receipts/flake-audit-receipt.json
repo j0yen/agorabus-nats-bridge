@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.flake_audit_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "pass",
+  "flaky_tests": [],
+  "note": "All tests are deterministic (no time-based, no network, no random seed without proptest's fixed seed). Proptest uses fixed seed for reproducibility.",
+  "captured_at": "2026-06-05T01:55:57Z"
+}

@@ -1,0 +1,116 @@
+::gate cargo check
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+::gate cargo clippy
+::gate cargo test
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/wm_busbridge-92139f221844d743)
+
+running 11 tests
+test forward::tests::bridge_marker_detected ... ok
+test forward::tests::blocked_audio_chunk_not_forwarded ... ok
+test forward::tests::fleet_topic_is_forwarded ... ok
+test forward::tests::extra_allow_prefix_forwarded ... ok
+test forward::tests::local_topics_not_forwarded ... ok
+test forward::tests::unknown_topic_not_forwarded ... ok
+test forward::tests::non_bridged_payload_not_detected ... ok
+test nats_config::tests::hub_domain_qualified_api_prefix_documented ... ok
+test nats_config::tests::hub_config_has_jetstream_domain ... ok
+test nats_config::tests::leaf_config_has_jetstream_domain_and_hub_url ... ok
+test nats_config::tests::no_plaintext_creds_in_configs ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/wm_busbridge-03b538f402479d73)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac1.rs (target/debug/deps/acceptance_ac1-db823612b628145b)
+
+running 3 tests
+test acceptance_ac1 ... ok
+test test_non_fleet_event_not_forwarded ... ok
+test test_fleet_event_forwarded_to_nats ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac2.rs (target/debug/deps/acceptance_ac2-552a075c50e5fef9)
+
+running 3 tests
+test acceptance_ac2 ... ok
+test test_local_clients_unaffected ... ok
+test test_extra_allow_extends_fleet_prefixes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac3.rs (target/debug/deps/acceptance_ac3-7b83e8cfef2015d6)
+
+running 5 tests
+test test_bridge_marker_key_constant ... ok
+test acceptance_ac3 ... ok
+test test_local_event_not_detected_as_bridged ... ok
+test test_bridged_payload_serialization ... ok
+test test_loop_guard_no_echo ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac4.rs (target/debug/deps/acceptance_ac4-8e4afdccaf964a9b)
+
+running 4 tests
+test acceptance_ac4 ... ok
+test test_blocked_prefixes_include_documented_topics ... ok
+test test_local_only_topic_not_forwarded ... ok
+test test_blocked_takes_priority_over_allow ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac5.rs (target/debug/deps/acceptance_ac5-26b63013ed0d9423)
+
+running 6 tests
+test acceptance_ac5 ... ok
+test test_hub_config_documents_domain_api_prefix ... ok
+test test_hub_config_has_leafnode_listener ... ok
+test test_leaf_config_connects_to_hub ... ok
+test test_nats_config_has_jetstream_domain ... ok
+test test_leaf_config_has_own_jetstream_domain ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac6.rs (target/debug/deps/acceptance_ac6-7be966aed6c6c624)
+
+running 4 tests
+test test_leaf_creds_reference_variable ... ok
+test acceptance_ac6 ... ok
+test test_no_plaintext_creds_in_rendered_config ... ok
+test test_no_plaintext_creds_in_repo ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_ac7.rs (target/debug/deps/acceptance_ac7-1cf1612e1e444cc9)
+
+running 4 tests
+test acceptance_ac7 ... ok
+test test_selftest_subcommand_interface ... ok
+test test_selftest_subcommand_roundtrip ... ok
+test test_sigpipe_reset_present ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/proptest_invariants.rs (target/debug/deps/proptest_invariants-964fe8a0b53ef8af)
+
+running 4 tests
+test local_topics_always_blocked ... ok
+test blocked_prefix_always_blocks ... ok
+test non_bridged_never_detected ... ok
+test bridged_payload_roundtrips ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests wm_busbridge
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+::gate audit

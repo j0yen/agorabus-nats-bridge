@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.cold_build_time_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "build_seconds_cached": 0.1,
+  "verdict": "pass",
+  "note": "Warm build (deps cached); cold build from clean would be longer.",
+  "captured_at": "2026-06-05T01:56:25Z"
+}

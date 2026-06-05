@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.binary_size_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "binary_size_bytes_debug": 91034984,
+  "verdict": "pass",
+  "note": "No size cap specified in intent-card; debug binary size reported for baseline.",
+  "captured_at": "2026-06-05T01:55:16Z"
+}

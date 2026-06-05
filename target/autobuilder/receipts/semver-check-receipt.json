@@ -1,0 +1,7 @@
+{
+  "schema": "autobuilder.semver_check_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "skipped",
+  "reason": "New crate (v0.1.0, no previous published version); semver-checks not applicable.",
+  "captured_at": "2026-06-05T01:55:57Z"
+}

@@ -1,0 +1,7 @@
+{
+  "schema": "autobuilder.bench_delta_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "skipped",
+  "reason": "No benchmarks defined for this CLI; performance is not an AC. Bridge latency is network-bound.",
+  "captured_at": "2026-06-05T01:55:30Z"
+}

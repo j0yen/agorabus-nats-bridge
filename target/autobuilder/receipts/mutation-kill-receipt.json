@@ -1,0 +1,8 @@
+{
+  "schema": "autobuilder.mutation_kill_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "skipped",
+  "reason": "Phase 1: mutation testing is telemetry-only, not a hard gate. cargo-mutants not run for this iteration.",
+  "mutation_kill_rate": null,
+  "captured_at": "2026-06-05T01:55:57Z"
+}

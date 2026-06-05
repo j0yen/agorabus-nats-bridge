@@ -1,4 +1,6 @@
-/target/
+/target/debug/
+/target/release/
+/target/*.json
 Cargo.lock
 *.creds
 *.nkey

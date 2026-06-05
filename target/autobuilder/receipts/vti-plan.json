@@ -1,0 +1,15 @@
+{
+  "base_ref": "HEAD",
+  "base_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "captured_at": "2026-06-05T01:52:42Z",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "min_confidence": 0.7,
+  "proof_lanes_path": "agent/proof-lanes.toml",
+  "proof_lanes_sha256": "sha256:6452ff7240bbe31675116ccd14c634498d110a300ca642153434a3ae745f4b7a",
+  "receipt_digest": "sha256:8c542206c1f7b64b64c2520bc521a6a4261eafdd29a115ae6c8c62c257953a98",
+  "required_commands": [],
+  "routes": [],
+  "schema": "autobuilder.vti_plan_receipt.v1",
+  "unrouted_paths": [],
+  "verdict": "pass"
+}

@@ -1,0 +1,124 @@
+{
+  "acceptance_criteria": [
+    {
+      "description": "wm-busbridge subscribes to the local agorabus UDS and a local NATS leaf and mirrors an allowlisted wm.fleet.* event published locally onto the matching NATS subject — verified against an embedded/test NATS server via async integration test.",
+      "id": "AC1",
+      "level": "MUST",
+      "test": "tests/acceptance_ac1.rs::test_fleet_event_forwarded_to_nats"
+    },
+    {
+      "description": "Local UDS clients are unchanged: an existing agorabus subscriber works identically with the bridge running, requiring no code or socket change — asserted by running a mock subscriber alongside the bridge in test.",
+      "id": "AC2",
+      "level": "MUST",
+      "test": "tests/acceptance_ac2.rs::test_local_clients_unaffected"
+    },
+    {
+      "description": "Loop guard: an event injected from NATS into the local bus is NOT re-published back to NATS — exactly-once delivery proven by counting NATS publishes in a selftest with a mock NATS server.",
+      "id": "AC3",
+      "level": "MUST",
+      "test": "tests/acceptance_ac3.rs::test_loop_guard_no_echo"
+    },
+    {
+      "description": "Selective forwarding: a high-volume/local-only topic (wm.audio.speech.chunk, wm.local.*) is NOT forwarded to NATS; only allowlisted fleet topics cross — asserted by publishing a blocked topic and verifying zero NATS messages received.",
+      "id": "AC4",
+      "level": "MUST",
+      "test": "tests/acceptance_ac4.rs::test_local_only_topic_not_forwarded"
+    },
+    {
+      "description": "The NATS topology config sets a JetStream domain on hub and leaves; a leaf client can reach a hub JetStream stream via the domain-qualified API prefix — documented in config files and asserted in a unit test parsing the NATS config.",
+      "id": "AC5",
+      "level": "MUST",
+      "test": "tests/acceptance_ac5.rs::test_nats_config_has_jetstream_domain"
+    },
+    {
+      "description": "Per-node NATS credentials come from an encrypted store path; the repo contains no plaintext creds — grep-asserted: no .creds/.nkey files committed, and the config references a path variable.",
+      "id": "AC6",
+      "level": "MUST",
+      "test": "tests/acceptance_ac6.rs::test_no_plaintext_creds_in_repo"
+    },
+    {
+      "description": "wm-busbridge selftest subcommand passes end-to-end (local publish → NATS once → back into a second local subscriber) and the daemon does not panic on a closed pipe (SIGPIPE reset present in main).",
+      "id": "AC7",
+      "level": "MUST",
+      "test": "tests/acceptance_ac7.rs::test_selftest_subcommand_roundtrip"
+    }
+  ],
+  "ambiguities_resolved": [
+    {
+      "question": "Should the bridge connect to a remote NATS hub or a local leaf?",
+      "resolution": "Bridge connects to a local leaf at 127.0.0.1:4222; the leaf dials the remote hub. This decouples the bridge from WAN connectivity."
+    },
+    {
+      "question": "How to prevent bridged events from looping back to NATS?",
+      "resolution": "Tag bridged messages with a header or subject prefix so an event that arrived from NATS is not re-published to NATS. Each message traverses the bridge at most once per direction."
+    },
+    {
+      "question": "Which NATS client library to use?",
+      "resolution": "async-nats (the official async Rust client) to stay consistent with tokio async runtime already used in wintermute."
+    }
+  ],
+  "created_at": "2026-06-04T00:00:00Z",
+  "five_whys_trace": [
+    {
+      "a": "agorabus only works over a local Unix-domain socket; wintermute daemons on different machines cannot see each other's wm.* events.",
+      "q": "Why do you need an agorabus-NATS bridge?",
+      "why": 1
+    },
+    {
+      "a": "NATS has no Unix-domain-socket listener (confirmed open/unimplemented upstream), so you cannot point NATS at the UDS socket — the two protocols are incompatible at the transport layer.",
+      "q": "Why can't you just make agorabus speak NATS directly?",
+      "why": 2
+    },
+    {
+      "a": "Every wintermute daemon (wm-stt, wm-brain, wm-audio, etc.) already speaks agorabus over the UDS; changing all of them just to get fleet visibility would be a massive disruptive migration with no benefit to local operation.",
+      "q": "Why must existing local clients remain unchanged?",
+      "why": 3
+    },
+    {
+      "a": "NATS's subject pub/sub maps directly onto wm.* topics and uniquely provides leaf-node topology — each machine is a leaf that serves local consumers first and queues cloudward traffic during disconnects. MQTT/Redis can't match this NAT-friendly architecture, and JetStream gives durable work-queues needed by constellation-dispatch.",
+      "q": "Why is NATS specifically the right cross-host bus rather than MQTT or Redis pub/sub?",
+      "why": 4
+    }
+  ],
+  "hard_constraints": {
+    "additional": {
+      "async_runtime": "tokio with full features for async bridge loop",
+      "nats_client": "async-nats crate for NATS connectivity",
+      "sigpipe_reset": "sigpipe::reset() must be the first statement in main()"
+    },
+    "deny_unsafe": true,
+    "max_deps": null,
+    "msrv": "1.85",
+    "rust_edition": "2024",
+    "target_kind": "cli"
+  },
+  "intent_slug": "agorabus-nats-bridge",
+  "non_goals": [
+    "Mesh networking / MagicDNS — that is constellation-mesh",
+    "Cloud hub host provisioning — that is constellation-cloud",
+    "Work dispatch on JetStream — that is constellation-dispatch",
+    "Modifying agorabus itself or its protocol",
+    "NATS server binary or embedded NATS server in the bridge (only a NATS client)",
+    "Cross-platform support beyond Linux (Arch, systemd-user)"
+  ],
+  "prd_source": "/home/jsy/wintermute/autobuilder/PRD-constellation-bus.md",
+  "receipt_digest": "sha256:b1017828dd0f3ade9a4c279e332e836c3e10241bbd13cfd75ea3735dd887be14",
+  "root_motivation": "Every wintermute daemon already speaks agorabus over a local Unix socket; the fleet vision requires that wm.* events are visible fleet-wide across machines, but NATS has no UDS listener and existing local clients must keep working unchanged — so a bridge sidecar is the only correct topology: it keeps the UDS for locals and opens a NATS TCP connection for the fleet, with a loop guard so bridged events don't echo.",
+  "schema": "autobuilder.intent_card.v1",
+  "scope": [
+    "Bridge daemon (wm-busbridge) that connects the local agorabus UDS to a local NATS leaf node",
+    "Allowlist-based selective forwarding of wm.fleet.* subjects to NATS",
+    "Loop guard: tag bridged messages so NATS-originated events are not re-forwarded to NATS",
+    "NATS topology config files for hub (JetStream domain=hub, leafnode listener) and leaf (per-machine)",
+    "wm-busbridge selftest subcommand for end-to-end round-trip verification",
+    "SIGPIPE-safe main() using sigpipe::reset()",
+    "Presence forwarding: node agorabus presence onto a fleet subject"
+  ],
+  "unfakeable_metric": {
+    "harness_command": "bash scripts/run-metrics.sh",
+    "lower_is_better": false,
+    "name": "acceptance_tests_passing_count",
+    "target": 7
+  },
+  "user_persona": "Joe Yen running wintermute on an Arch Linux laptop; later on every machine in the constellation fleet. The daemon runs unsupervised as a systemd user unit alongside agorabus."
+}

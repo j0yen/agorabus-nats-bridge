@@ -1,0 +1,7 @@
+{
+  "schema": "autobuilder.experiment_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "skipped",
+  "reason": "No multi-slice experiment.toml defined for this PRD. Single-slice build.",
+  "captured_at": "2026-06-05T01:55:57Z"
+}

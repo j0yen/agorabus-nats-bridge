@@ -1,0 +1,66 @@
+{
+  "schema": "autobuilder.ac_traceability_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "pass",
+  "ac_results": [
+    {
+      "id": "AC1",
+      "test_file": "tests/acceptance_ac1.rs",
+      "source_files": [
+        "src/forward.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC2",
+      "test_file": "tests/acceptance_ac2.rs",
+      "source_files": [
+        "src/config.rs",
+        "src/bridge.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC3",
+      "test_file": "tests/acceptance_ac3.rs",
+      "source_files": [
+        "src/forward.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC4",
+      "test_file": "tests/acceptance_ac4.rs",
+      "source_files": [
+        "src/forward.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC5",
+      "test_file": "tests/acceptance_ac5.rs",
+      "source_files": [
+        "src/nats_config.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC6",
+      "test_file": "tests/acceptance_ac6.rs",
+      "source_files": [
+        "src/nats_config.rs"
+      ],
+      "status": "traced"
+    },
+    {
+      "id": "AC7",
+      "test_file": "tests/acceptance_ac7.rs",
+      "source_files": [
+        "src/main.rs",
+        "src/selftest.rs"
+      ],
+      "status": "traced"
+    }
+  ],
+  "captured_at": "2026-06-05T01:55:57Z"
+}

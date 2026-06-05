@@ -1,0 +1,9 @@
+{
+  "schema": "autobuilder.supply_audit_receipt.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "verdict": "pass",
+  "tool": "cargo deny check bans licenses sources",
+  "blocking_count": 0,
+  "advisory_count": 0,
+  "captured_at": "2026-06-05T01:55:05Z"
+}

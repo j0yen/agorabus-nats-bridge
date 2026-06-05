@@ -1,0 +1,12 @@
+{
+  "schema": "autobuilder.review_request.v1",
+  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "base_ref": "HEAD",
+  "base_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
+  "intent_card_sha256": "sha256:3b768233cb551d1f5342bba08254a52a889ef78c7387a4e9b160194a09537d93",
+  "intent_card_path": "agent/intent-card.json",
+  "commit_count": 0,
+  "commits": [],
+  "changed_files": [],
+  "captured_at": "2026-06-05T01:53:37Z"
+}
