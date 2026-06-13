@@ -8,3 +8,4 @@ pub mod hub_status;
 pub mod hub_watcher;
 pub mod nats_config;
 pub mod selftest;
+pub mod status;
