@@ -12,7 +12,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use wm_busbridge::{bridge, config, nats_config, selftest};
+use wm_busbridge::{bridge, config, hub_status, hub_watcher, nats_config, selftest};
 
 #[derive(Parser)]
 #[command(name = "wm-busbridge", about = "agorabus <-> NATS bridge for wintermute fleet")]
@@ -54,6 +54,12 @@ enum Command {
         #[arg(long, default_value = "$WM_NATS_CREDS")]
         creds_path: String,
     },
+    /// Print hub reachability state (exit 0=UP, 1=DOWN).
+    HubStatus {
+        /// Output as JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[tokio::main]
@@ -87,7 +93,10 @@ async fn main() -> Result<()> {
     };
 
     match cli.command.unwrap_or(Command::Run) {
-        Command::Run => bridge::run(cfg).await,
+        Command::Run => {
+            let liveness = hub_watcher::new_shared_liveness();
+            bridge::run(cfg, liveness).await
+        }
         Command::Selftest => selftest::run(cfg).await,
         Command::NatsConfig { variant, domain, hub_url, creds_path } => {
             let nc = nats_config::NatsTopologyConfig {
@@ -98,6 +107,15 @@ async fn main() -> Result<()> {
             };
             print!("{}", nc.render());
             Ok(())
+        }
+        Command::HubStatus { json } => {
+            // hub-status reads the liveness state; when called standalone
+            // (not inside the daemon process) it cannot share in-process state.
+            // Print a note that this is only meaningful when the daemon uses
+            // shared memory or IPC.  For now we report UP (daemon not running
+            // in this process) — future work: read from a state file / socket.
+            let liveness = hub_watcher::new_shared_liveness();
+            hub_status::run(liveness, json).await
         }
     }
 }

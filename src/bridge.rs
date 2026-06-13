@@ -2,6 +2,9 @@
 
 use crate::config::BridgeConfig;
 use crate::forward::{BridgedPayload, should_forward};
+use crate::hub_watcher::{
+    HubWatcherConfig, NatsClientSink, NatsHubProbe, SharedLiveness, maybe_buffer, run_watcher,
+};
 use anyhow::{Context as _, Result};
 use futures::StreamExt as _;
 use std::sync::Arc;
@@ -14,13 +17,14 @@ use tracing::{debug, error, info, warn};
 /// Connects to the local agorabus UDS and local NATS leaf, then:
 /// - Subscribes to all `wm.*` topics on agorabus; forwards allowlisted ones to NATS.
 /// - Subscribes to `wm.>` on NATS; injects events into agorabus (with loop guard).
+/// - Spawns a hub-liveness watcher that emits `wm.fleet.hub.down/up` events.
 ///
 /// # Errors
 ///
 /// Returns `Err` on fatal setup failures (NATS connect, agorabus connect).
 /// Transient errors on individual events are logged and skipped.
 #[allow(clippy::similar_names)] // pub vs sub are distinct enough
-pub async fn run(cfg: BridgeConfig) -> Result<()> {
+pub async fn run(cfg: BridgeConfig, liveness: SharedLiveness) -> Result<()> {
     info!(
         socket = %cfg.socket_path.display(),
         nats_url = %cfg.nats_url,
@@ -42,6 +46,26 @@ pub async fn run(cfg: BridgeConfig) -> Result<()> {
 
     let allow = cfg.fleet_allow_prefixes();
 
+    // Spawn the hub-liveness watcher
+    let watcher_cfg = HubWatcherConfig::default();
+    let probe = Arc::new(NatsHubProbe::new(
+        nats.clone(),
+        watcher_cfg.probe_timeout_secs,
+    ));
+    let sink = Arc::new(NatsClientSink::new(nats.clone()));
+    let liveness_watcher = Arc::clone(&liveness);
+    let socket_path_watcher = cfg.socket_path.clone();
+    let hub_watcher_task = tokio::spawn(async move {
+        run_watcher(
+            watcher_cfg,
+            probe,
+            sink,
+            liveness_watcher,
+            socket_path_watcher,
+        )
+        .await;
+    });
+
     // Spawn the NATS→agorabus direction
     let nats_to_bus = {
         let nats_clone = nats.clone();
@@ -55,9 +79,10 @@ pub async fn run(cfg: BridgeConfig) -> Result<()> {
     };
 
     // Run the agorabus→NATS direction in the main task
-    let result = agorabus_to_nats_loop(bus_subscriber, nats, allow).await;
+    let result = agorabus_to_nats_loop(bus_subscriber, nats, allow, liveness).await;
 
     nats_to_bus.abort();
+    hub_watcher_task.abort();
     result
 }
 
@@ -190,12 +215,17 @@ async fn connect_agorabus_sub(cfg: &BridgeConfig) -> Result<AgorabusSubscriber> 
 }
 
 /// agorabus → NATS direction.
+///
+/// When the hub is DOWN (per the liveness state), allowlisted fleet events are
+/// buffered rather than forwarded.
 async fn agorabus_to_nats_loop(
     mut sub: AgorabusSubscriber,
     nats: async_nats::Client,
     allow: Vec<String>,
+    liveness: SharedLiveness,
 ) -> Result<()> {
     info!("agorabus→NATS loop started");
+    let watcher_cfg = crate::hub_watcher::HubWatcherConfig::default();
     loop {
         match sub.next_event().await {
             Ok(Some((topic, data, _from))) => {
@@ -217,6 +247,18 @@ async fn agorabus_to_nats_loop(
                         continue;
                     }
                 };
+                // If hub is DOWN, buffer instead of forwarding
+                let buffered = maybe_buffer(
+                    &liveness,
+                    &topic,
+                    bytes::Bytes::from(payload_bytes.clone()),
+                    &watcher_cfg,
+                )
+                .await;
+                if buffered {
+                    debug!(topic = %topic, "hub DOWN: event buffered");
+                    continue;
+                }
                 debug!(topic = %topic, "forwarding to NATS");
                 if let Err(e) = nats.publish(topic.clone(), payload_bytes.into()).await {
                     error!(topic = %topic, error = %e, "failed to publish to NATS");
