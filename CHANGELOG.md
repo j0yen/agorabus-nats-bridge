@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0 — 2026-06-13
+
+Added hub-liveness watcher to agorabus-nats-bridge:
+- HubWatcherConfig (probe_secs=5, down_threshold=3, up_threshold=2)
+- run_watcher async task: NATS flush probe, DOWN→wm.fleet.hub.down on local bus, UP→wm.fleet.hub.up + buffer flush
+- Ring buffer: 1000 events / 10 MiB cap, drop-oldest with dropped counter
+- bridge::run wires watcher + buffers outbound events while hub DOWN
+- wm-busbridge hub-status [--json]: exit 0=UP, 1=DOWN; JSON: state/seconds_in_state/buffered/dropped
+- 8 unit tests covering all ACs; all 42+21 tests green
+
 ## v0.2.0 — 2026-06-05
 
 Adds the constellation-dispatch layer to agorabus-nats-bridge: a JetStream
