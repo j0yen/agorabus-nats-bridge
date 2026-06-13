@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.5.0 — 2026-06-13
+
+wm-busbridge status subcommand: fleet dashboard with 52 tests green. Adds KV registry reader + work-queue depth display, STALE detection, --json output, bounded NATS timeout, SIGPIPE safety.
+
 ## v0.4.0 — 2026-06-13
 
 Hub-liveness watcher added to agorabus-nats-bridge Run daemon. Implements NATS
