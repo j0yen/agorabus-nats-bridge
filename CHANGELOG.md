@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.0 — 2026-06-13
+
+Hub-liveness watcher added to agorabus-nats-bridge Run daemon. Implements NATS
+ping/flush probing (every 5s), DOWN/UP hysteresis (3 failures → DOWN, 2
+successes → UP), state-change events on local agorabus (wm.fleet.hub.down /
+wm.fleet.hub.up), bounded ring buffer (1000 events / 10MiB) with drop-oldest
+and dropped counter, and wm-busbridge hub-status [--json] subcommand (exit 0=UP,
+1=DOWN). All 7 ACs pass in acceptance test suite.
+
 ## v0.3.0 — 2026-06-13
 
 Hub-liveness watcher added to agorabus-nats-bridge Run daemon. Implements NATS
