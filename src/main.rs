@@ -12,7 +12,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use wm_busbridge::{bridge, config, hub_status, hub_watcher, nats_config, selftest};
+use wm_busbridge::{bridge, config, hub_status, hub_watcher, nats_config, selftest, status};
 
 #[derive(Parser)]
 #[command(name = "wm-busbridge", about = "agorabus <-> NATS bridge for wintermute fleet")]
@@ -60,6 +60,18 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Print the live fleet dashboard (KV registry + work-queue depth).
+    Status {
+        /// Mark nodes as STALE when their heartbeat is older than this many seconds.
+        #[arg(long, default_value = "30")]
+        stale_after: u64,
+        /// Emit JSON instead of the human-readable table.
+        #[arg(long)]
+        json: bool,
+        /// Optional path to fleet-nodes.conf for expected-node list.
+        #[arg(long)]
+        fleet_nodes_conf: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -88,7 +100,7 @@ async fn main() -> Result<()> {
 
     let cfg = config::BridgeConfig {
         socket_path,
-        nats_url: cli.nats_url,
+        nats_url: cli.nats_url.clone(),
         extra_allow,
     };
 
@@ -116,6 +128,16 @@ async fn main() -> Result<()> {
             // in this process) — future work: read from a state file / socket.
             let liveness = hub_watcher::new_shared_liveness();
             hub_status::run(liveness, json).await
+        }
+        Command::Status { stale_after, json, fleet_nodes_conf } => {
+            let opts = status::StatusOptions {
+                nats_url: cli.nats_url,
+                stale_after_secs: stale_after,
+                json,
+                fleet_nodes_conf,
+            };
+            let code = status::run(opts).await?;
+            std::process::exit(code);
         }
     }
 }
