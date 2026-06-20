@@ -1,7 +1,0 @@
-{
-  "schema": "autobuilder.sbom_receipt.v1",
-  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
-  "verdict": "pass",
-  "note": "SBOM available via cargo metadata. Key direct deps: async-nats 0.38.0, tokio 1, sigpipe 0.1, clap 4, serde 1, anyhow 1, tracing 0.1.",
-  "captured_at": "2026-06-05T01:55:05Z"
-}

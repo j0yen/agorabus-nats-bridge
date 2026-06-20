@@ -1,7 +1,0 @@
-{
-  "schema": "autobuilder.schema_compat_receipt.v1",
-  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
-  "verdict": "pass",
-  "note": "BridgedPayload wire schema is stable: {_wm_bridged: bool, topic: str, data: any, from: str}. NATS subject names match wm.* pattern. No breaking schema changes.",
-  "captured_at": "2026-06-05T01:55:57Z"
-}

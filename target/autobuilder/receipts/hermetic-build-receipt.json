@@ -1,7 +1,0 @@
-{
-  "schema": "autobuilder.hermetic_build_receipt.v1",
-  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
-  "verdict": "pass",
-  "note": "All deps resolved from crates.io (cargo deny sources: pass). No git deps, no local path deps. Build is hermetic.",
-  "captured_at": "2026-06-05T01:55:30Z"
-}

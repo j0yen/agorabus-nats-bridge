@@ -1,7 +1,0 @@
-{
-  "schema": "autobuilder.determinism_receipt.v1",
-  "head_sha": "533c0a46856176c662bb6a39e6e3c1fe2a9ceae1",
-  "verdict": "pass",
-  "note": "cargo build is deterministic for this project (no build.rs, no proc-macro randomness). Config rendering (NatsTopologyConfig::render) is pure string formatting.",
-  "captured_at": "2026-06-05T01:55:30Z"
-}

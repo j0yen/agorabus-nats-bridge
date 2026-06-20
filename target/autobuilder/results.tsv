@@ -1,2 +1,0 @@
-commit	metric	iteration	ac_pass	ac_total	status	description
-533c0a4	7	1	7	7	baseline	scaffold: all 7 ACs green, clippy clean, deny clean
