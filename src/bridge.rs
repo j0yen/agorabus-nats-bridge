@@ -117,6 +117,9 @@ impl AgorabusPublisher {
 /// A minimal agorabus subscriber that reads `ServerEvent` lines.
 struct AgorabusSubscriber {
     reader: tokio::io::Lines<tokio::io::BufReader<tokio::net::unix::OwnedReadHalf>>,
+    /// Held to keep the UDS connection open; dropping this sends EOF to the
+    /// daemon, which closes the read side and terminates event delivery.
+    _write: tokio::net::unix::OwnedWriteHalf,
 }
 
 impl AgorabusSubscriber {
@@ -211,7 +214,7 @@ async fn connect_agorabus_sub(cfg: &BridgeConfig) -> Result<AgorabusSubscriber> 
     write.flush().await.context("flushing subscribe")?;
 
     let reader = BufReader::new(read).lines();
-    Ok(AgorabusSubscriber { reader })
+    Ok(AgorabusSubscriber { reader, _write: write })
 }
 
 /// agorabus → NATS direction.
