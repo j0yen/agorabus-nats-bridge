@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::dispatch::{node_name_from_key, NodeCapability, NodeRole, NODES_BUCKET, WORK_STREAM};
+use crate::dispatch::{fleet_js, node_name_from_key, NodeCapability, NodeRole, NODES_BUCKET, WORK_STREAM};
 
 // ─── public options ──────────────────────────────────────────────────────────
 
@@ -250,7 +250,7 @@ pub async fn run(opts: StatusOptions) -> Result<i32> {
         }
     };
 
-    let js = async_nats::jetstream::new(client);
+    let js = fleet_js(client);
 
     // ── read WM_NODES KV ──────────────────────────────────────────────────
 

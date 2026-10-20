@@ -44,12 +44,36 @@ use std::collections::HashMap;
 pub const WORK_STREAM: &str = "WM_WORK";
 /// NATS KV bucket name for the capability registry.
 pub const NODES_BUCKET: &str = "WM_NODES";
+/// Default JetStream domain of the fleet hub, where the shared registry lives.
+pub const FLEET_JS_DOMAIN_DEFAULT: &str = "hub";
+/// Environment variable overriding [`FLEET_JS_DOMAIN_DEFAULT`].
+pub const FLEET_JS_DOMAIN_ENV: &str = "WM_FLEET_JS_DOMAIN";
 /// Key prefix for entries in [`NODES_BUCKET`].
 pub const NODE_KEY_PREFIX: &str = "node.";
 /// Subject prefix for work messages.
 pub const WORK_SUBJECT_PREFIX: &str = "wm.work.";
 /// Hard upper bound on job payload bytes to keep the bus lean.
 pub const MAX_JOB_PAYLOAD_BYTES: usize = 64 * 1024; // 64 KiB
+
+/// JetStream domain holding the fleet-wide `WM_NODES` / `WM_WORK` state.
+///
+/// Every leaf runs its own JetStream domain, so a plain `jetstream::new`
+/// context sees only the local node. Fleet state lives in the hub's domain.
+#[must_use]
+pub fn fleet_domain() -> String {
+    std::env::var(FLEET_JS_DOMAIN_ENV)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| FLEET_JS_DOMAIN_DEFAULT.to_string())
+}
+
+/// JetStream context scoped to the fleet (hub) domain. Both the heartbeat
+/// writer and the `status` reader MUST obtain their context here.
+#[must_use]
+pub fn fleet_js(client: async_nats::Client) -> async_nats::jetstream::Context {
+    async_nats::jetstream::with_domain(client, fleet_domain())
+}
 
 /// KV key under which node `name` publishes its capability (`node.<name>`).
 ///

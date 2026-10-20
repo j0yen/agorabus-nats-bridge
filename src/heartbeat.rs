@@ -16,7 +16,7 @@ use anyhow::{Context as _, Result};
 use async_nats::jetstream::{self, kv};
 use tracing::{debug, info, warn};
 
-use crate::dispatch::{NODES_BUCKET, node_key, sample_local_capacity};
+use crate::dispatch::{NODES_BUCKET, fleet_js, node_key, sample_local_capacity};
 
 /// Seconds between heartbeats.
 pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
@@ -68,7 +68,7 @@ async fn ensure_bucket(js: &jetstream::Context) -> Result<kv::Store> {
 /// Run the heartbeat loop forever. Never returns an error and never panics;
 /// callers spawn it and abort the task on shutdown.
 pub async fn run(nats: async_nats::Client) {
-    let js = jetstream::new(nats);
+    let js = fleet_js(nats);
     let key = node_key(&local_node_name());
     let mut store: Option<kv::Store> = None;
     let mut tick = tokio::time::interval(Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
@@ -133,6 +133,14 @@ mod tests {
     #[test]
     fn expiry_is_longer_than_stale_threshold_and_interval() {
         assert!(NODES_MAX_AGE_SECS > HEARTBEAT_INTERVAL_SECS * 2);
+    }
+
+    #[test]
+    fn fleet_domain_defaults_to_hub() {
+        // Only asserts the default when the override is unset in the test env.
+        if std::env::var(crate::dispatch::FLEET_JS_DOMAIN_ENV).is_err() {
+            assert_eq!(crate::dispatch::fleet_domain(), "hub");
+        }
     }
 
     #[test]
