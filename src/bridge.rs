@@ -66,6 +66,10 @@ pub async fn run(cfg: BridgeConfig, liveness: SharedLiveness) -> Result<()> {
         .await;
     });
 
+    // Spawn the capability heartbeat (WM_NODES KV) so `wm-busbridge status`
+    // lists this node. Failures are logged and retried inside the task.
+    let heartbeat_task = tokio::spawn(crate::heartbeat::run(nats.clone()));
+
     // Spawn the NATS→agorabus direction
     let nats_to_bus = {
         let nats_clone = nats.clone();
@@ -83,6 +87,7 @@ pub async fn run(cfg: BridgeConfig, liveness: SharedLiveness) -> Result<()> {
 
     nats_to_bus.abort();
     hub_watcher_task.abort();
+    heartbeat_task.abort();
     result
 }
 
