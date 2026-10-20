@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::dispatch::{NodeCapability, NodeRole, NODES_BUCKET, WORK_STREAM};
+use crate::dispatch::{node_name_from_key, NodeCapability, NodeRole, NODES_BUCKET, WORK_STREAM};
 
 // ─── public options ──────────────────────────────────────────────────────────
 
@@ -272,10 +272,7 @@ pub async fn run(opts: StatusOptions) -> Result<i32> {
                     match serde_json::from_slice::<NodeCapability>(&entry) {
                         Ok(cap) => {
                             // Strip "node." prefix from the key if present
-                            let display_name = key
-                                .strip_prefix("node.")
-                                .unwrap_or(&key)
-                                .to_string();
+                            let display_name = node_name_from_key(&key).to_string();
                             rows.push(make_node_row(&display_name, &cap, now_secs, opts.stale_after_secs));
                         }
                         Err(e) => {

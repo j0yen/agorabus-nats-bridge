@@ -44,10 +44,27 @@ use std::collections::HashMap;
 pub const WORK_STREAM: &str = "WM_WORK";
 /// NATS KV bucket name for the capability registry.
 pub const NODES_BUCKET: &str = "WM_NODES";
+/// Key prefix for entries in [`NODES_BUCKET`].
+pub const NODE_KEY_PREFIX: &str = "node.";
 /// Subject prefix for work messages.
 pub const WORK_SUBJECT_PREFIX: &str = "wm.work.";
 /// Hard upper bound on job payload bytes to keep the bus lean.
 pub const MAX_JOB_PAYLOAD_BYTES: usize = 64 * 1024; // 64 KiB
+
+/// KV key under which node `name` publishes its capability (`node.<name>`).
+///
+/// The heartbeat writer and the `status` reader both go through this and
+/// [`node_name_from_key`], so the key format has a single definition.
+#[must_use]
+pub fn node_key(name: &str) -> String {
+    format!("{NODE_KEY_PREFIX}{name}")
+}
+
+/// Inverse of [`node_key`]: strips the `node.` prefix when present.
+#[must_use]
+pub fn node_name_from_key(key: &str) -> &str {
+    key.strip_prefix(NODE_KEY_PREFIX).unwrap_or(key)
+}
 
 // ─── node role ──────────────────────────────────────────────────────────────
 
